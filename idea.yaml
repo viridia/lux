@@ -1,0 +1,124 @@
+# Sketch for a yaml-based language for defining patterns
+pattern:
+  name: rainbow
+  defs:
+    osc1:
+      type: Oscillator
+      freq: 0.1
+      wave: sine
+    osc2:
+      type: Oscillator
+      freq: 0.2 + osc1
+  eval:
+    output: HSV(h = osc1(offset=-n / 4.0), 1, 0.1)
+
+pattern:
+  name: blender
+  defs:
+    p1:
+      type: Pattern
+      name: rainbow
+    p2:
+      type: Pattern
+      name: pulser
+  eval:
+    - Mix(p1, p2, t)
+
+pattern:
+  name: warp-core
+  defs:
+    - wave:
+        type: Oscillator
+        freq: 4.0
+        waveform: sine
+    - hue1:
+        type: Interpolator
+        init: random(1)
+        rate: 0.3
+        wrap: true
+    - hue2:
+        type: Interpolator
+        init: random()
+        rate: 0.3
+        wrap: true
+    - speed:
+        type: Interpolator
+        init: random()
+        rate: 0.3
+    - pulse:
+        type: Ramp
+        range: -0.5, 1.5
+        duration: 0.5
+    - timer:
+        type: Timer
+        action:
+          - hue1.next = (hue1 + random(-.1, .1)) % 1
+          - hue2.next = (hue1.next + random(-.13, .13)) % 1
+          - speed.next = clamp(speed.next + random(-.2, .2), 0.5, 6)
+          - timer.start(1 + random(3))
+    - timer2:
+        type: Timer
+        action:
+          - pulse.reset()
+          - timer2.start(0.5 + random(2))
+
+  - start:
+    - timer.start()
+    - timer1.start()
+
+  - update:
+    - wave.frequency = speed
+
+  - eval:
+    - c0: HSV(hue1, 1, 0.3)
+    - c1: HSV(hue2, 1, 1)
+    - cc: lerp3(c0, c1, wave(offset=-n * 1.9))
+    - ap: (1 / (1 + abs(n - pulse()) * 10)) ** 3;
+    - c2: HSV(hue1(), 0.5, ap)
+    - return: max3(cc, c2)
+
+pattern warpCore {
+  wave = Oscillator(freq=4, waveform=SINE);
+  hue1 = Interpolator(random(), rate=0.3, wrap=true);
+  hue2 = Interpolator(random(), rate=0.3, wrap=true);
+  speed = Interpolator(random(), rate=0.3)
+  pulse = Ramp(min=-0.5, max=1.5, duration=0.5)
+
+  timer = Timer({
+    hue1.next = (hue1.next + random(-.1, .1)) % 1;
+    hue2.next = (hue1.next + random(-.13, .13)) % 1;
+    speed.next = clamp(speed.next + random(-.2, .2), 0.5, 6)
+    timer.start(random(1, 4))
+  })
+
+  timer2 = Timer({
+    pulse.reset()
+    timer2.start(random(0.5, 2.5))
+  })
+
+  start {
+    timer.start(0)
+    timer2.start(1)
+  }
+
+  update {
+    wave.frequency = speed()
+  }
+
+  eval {
+    let c0 = HSV(hue1, 1, 0.3)
+    let c1 = HSV(hue2, 1, 1)
+    let cc = lerp3(c0, c1, wave(offset = -n * 1.9))
+
+    let pulseLightness = (1 / (1 + abs(n - pulse) * 10)) ** 3;
+    let pulseColor = HSV(hue1, 0.5, pulseLightness)
+
+    return max(cc, pulseColor)
+  }
+}
+
+pattern:
+  name: gradient
+    gr0:
+      type: GradientRGB
+      stops:
